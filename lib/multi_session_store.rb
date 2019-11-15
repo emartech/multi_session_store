@@ -1,4 +1,5 @@
 require "multi_session_store/version"
+require "multi_session_store/subsession_generator_middleware"
 require "action_dispatch"
 
 module ActionDispatch
@@ -38,7 +39,7 @@ module ActionDispatch
         sid
       end
 
-    private
+      private
 
       def cache_key(env, sid)
         subsession_id = env.params[@param] || "no_subsession"
