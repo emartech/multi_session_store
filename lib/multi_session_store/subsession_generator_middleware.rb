@@ -28,7 +28,7 @@ module MultiSessionStore
     end
 
     def excluded_paths
-      @config[:exclude_path] ||= []
+      @config[:exclude_paths] ||= []
     end
   end
 end

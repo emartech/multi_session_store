@@ -42,7 +42,7 @@ RSpec.describe MultiSessionStore::SubsessionGeneratorMiddleware do
     end
 
     context 'when the path is excluded from subsession management' do
-      let(:config) { {exclude_path: ['/some_path', '/healthcheck']} }
+      let(:config) { {exclude_paths: ['/some_path', '/healthcheck']} }
 
       it 'does not generate a subsession ID into the request' do
         call
@@ -50,7 +50,7 @@ RSpec.describe MultiSessionStore::SubsessionGeneratorMiddleware do
       end
 
       context 'and the exclude path is a regexp' do
-        let(:config) { {exclude_path: [%r'/health.*']} }
+        let(:config) { {exclude_paths: [%r'/health.*']} }
 
         it 'does not generate a subsession ID into the request' do
           call
