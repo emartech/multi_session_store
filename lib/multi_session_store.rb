@@ -1,5 +1,6 @@
 require "multi_session_store/version"
 require "multi_session_store/subsession_generator_middleware"
+require "multi_session_store/default_url_options"
 require "multi_session_store/railtie" if defined? Rails
 require "action_dispatch"
 

@@ -5,5 +5,9 @@ module MultiSessionStore
     initializer 'multi_session_store.add_middleware' do |app|
       app.config.middleware.use MultiSessionStore::SubsessionGeneratorMiddleware, exclude_path: app.config.multi_session_store.exclude_path
     end
+
+    config.after_initialize do
+      ApplicationController.prepend MultiSessionStore::DefaultUrlOptions
+    end
   end
 end
