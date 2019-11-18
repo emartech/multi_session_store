@@ -1,20 +1,26 @@
+require 'redis/distributed'
+
 RSpec.describe ActionDispatch::Session::MultiSessionStore do
-  let(:cache) { double('Cache', options: cache_options) }
-  let(:cache_options) { {} }
+  subject(:store) { described_class.new(:app, redis: redis, serializer: serializer) }
+  let(:redis) { instance_spy Redis::Distributed }
+  let(:serializer) { double 'Serializer' }
+  let(:env) { OpenStruct.new params: params }
+  let(:params) { {} }
 
   describe '#initialize' do
-    context 'with a :cache option' do
-      subject do
-        ActionDispatch::Session::MultiSessionStore.new(:app, { cache: cache } )
-      end
+    subject(:store) { described_class.new(:app, options) }
+    let(:options) { {} }
+
+    context 'with a :redis option' do
+      let(:options) { {redis: redis} }
 
       it 'takes that as a passed in parameter' do
-        expect(subject.default_options[:cache]).to eql(cache)
+        expect(store.default_options[:redis]).to eq redis
       end
     end
 
     context 'with an :expire_after option' do
-      subject(:store) { ActionDispatch::Session::MultiSessionStore.new(:app, { expire_after: 1 }) }
+      let(:options) { {expire_after: 1} }
 
       it 'persists it in default_options' do
         expect(store.default_options[:expire_after]).to eq 1
@@ -22,123 +28,122 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
     end
 
     context 'without an :expire_after option' do
-      subject(:store) { ActionDispatch::Session::MultiSessionStore.new(:app, { cache: cache }) }
-
-      let(:cache_options) { {expires_in: 123} }
-
       it 'sets its value to @cache.options[:expires_in]' do
-        expect(store.default_options[:expire_after]).to eql(123)
+        expect(store.default_options[:expire_after]).to eq described_class::DEFAULT_SESSION_EXPIRATION
       end
     end
 
-    context 'with a param option' do
-      subject(:store) { ActionDispatch::Session::MultiSessionStore.new(:app, { expire_after: 1, param: 'my_store_param' }) }
+    context 'with a param_name option' do
+      let(:options) { {param_name: 'my_store_param'} }
 
       it 'persists it in default_options' do
-        expect(store.default_options[:param]).to eql('my_store_param')
+        expect(store.default_options[:param_name]).to eq 'my_store_param'
+      end
+    end
+
+    context 'without a param_name option' do
+      it 'persists it in default_options' do
+        expect(store.default_options[:param_name]).to eq 'subsession_id'
       end
     end
 
     context 'with a serializer option' do
-      subject(:store) { ActionDispatch::Session::MultiSessionStore.new(:app, { expire_after: 1, serializer: 'JSON' }) }
+      let(:options) { {serializer: 'JSON'} }
 
       it 'persists it in default_options' do
-        expect(store.default_options[:serializer]).to eql('JSON')
+        expect(store.default_options[:serializer]).to eq 'JSON'
       end
     end
   end
 
   describe '#find_session' do
-    let(:store) do
-      ActionDispatch::Session::MultiSessionStore.new(:app, expires_after: 1, cache: cache, serializer: serializer)
+    before do
+      allow(store).to receive(:generate_sid).and_return(:generated_sid)
     end
 
     context 'without an sid' do
-      let(:serializer) { double('Serializer') }
-      let(:cache_key) { '_session_id:123:1234' }
-
-      before do
-        expect(store).to receive(:generate_sid).and_return(:generated_sid)
-        expect(store).to receive(:cache_key).with(:env, :generated_sid).and_return(cache_key)
-        expect(cache).to receive(:read).with(cache_key).and_return(:cache_content)
-        expect(serializer).to receive(:parse).with(:cache_content).and_return(:session)
-      end
-
-      it 'returns a generated sid and a session in an array' do
-        expect(store.find_session(:env, nil)).to eql([:generated_sid, :session])
+      it 'returns a generated sid and an empty session hash in an array' do
+        expect(store.find_session(:env, nil)).to eql([:generated_sid, {}])
       end
     end
 
     context 'with an sid' do
-      let(:serializer) { double('Serializer') }
-      let(:cache_key) { '_session_id:123:1234' }
+      subject(:find_session) { store.find_session env, :sid }
 
       before do
-        expect(store).to receive(:cache_key).with(:env, :sid).and_return(cache_key)
-        expect(cache).to receive(:read).with(cache_key).and_return(:cache_content)
-        expect(serializer).to receive(:parse).with(:cache_content).and_return(:session)
+        allow(redis).to receive(:get).with(session_store_key).and_return(:serialized_session_data)
+        allow(serializer).to receive(:parse).with(:serialized_session_data).and_return(:session_data)
       end
 
-      it 'returns the sid passed in and a session in an array' do
-        expect(store.find_session(:env, :sid)).to eql([:sid, :session])
+      context "and we don't have a subsession ID yet" do
+        let(:params) { {} }
+        let(:session_store_key) { '_session_id:sid:no_subsession' }
+
+        it 'returns the sid passed in and the corresponding session in an array' do
+          expect(find_session).to eq [:sid, :session_data]
+        end
+      end
+
+      context 'and we have a subsession ID' do
+        let(:params) { {'subsession_id' => 'subsid'} }
+        let(:session_store_key) { '_session_id:sid:subsid' }
+
+        it 'returns the sid passed in and the corresponding session in an array' do
+          expect(find_session).to eq [:sid, :session_data]
+        end
       end
     end
   end
 
   describe '#write_session' do
-    let(:store) do
-      ActionDispatch::Session::MultiSessionStore.new(:app, expires_after: 1, cache: cache, serializer: serializer)
-    end
-
-    subject(:write_session) { store.write_session(:env, :sid, session, options) }
-
+    subject(:write_session) { store.write_session(env, :sid, session, options) }
     let(:options) { {expire_after: 123} }
-    let(:serializer) { double('Serializer') }
-
-    before do
-      expect(store).to receive(:cache_key).with(:env, :sid).and_return(:key)
-    end
+    let(:params) { {'subsession_id' => 'subsid'} }
+    let(:session_store_key) { '_session_id:sid:subsid' }
 
     context 'with a session' do
-      let(:session) { :session }
+      let(:session) { :session_data }
 
       before do
-        expect(serializer).to receive(:dump).with(:session).and_return(:serialized_session)
-        expect(cache).to receive(:write).with(:key, :serialized_session, expires_in: 123)
+        allow(serializer).to receive(:dump).with(:session_data).and_return(:serialized_session_data)
       end
 
-      it 'writes to the cache and returns sid' do
-        expect(write_session).to eq(:sid)
+      it 'writes the session to the storage' do
+        write_session
+        expect(redis).to have_received(:set).with(session_store_key, :serialized_session_data, ex: 123)
+      end
+
+      it 'returns the sid' do
+        expect(write_session).to eq :sid
       end
     end
 
     context 'without a session' do
       let(:session) { nil }
 
-      before do
-        expect(cache).to receive(:delete).with(:key)
+      it 'deletes the session from the storage' do
+        write_session
+        expect(redis).to have_received(:del).with(session_store_key)
       end
 
-      it 'deletes from the cache and returns sid' do
-        expect(write_session).to eq(:sid)
+      it 'returns the sid' do
+        expect(write_session).to eq :sid
       end
     end
   end
 
   describe '#delete_session' do
-    let(:store) do
-      ActionDispatch::Session::MultiSessionStore.new(:app, expires_after: 1, cache: cache)
+    subject(:delete_session) { store.delete_session(env, :sid, :options) }
+    let(:params) { {'subsession_id' => 'subsid'} }
+    let(:session_store_key) { '_session_id:sid:subsid' }
+
+    it 'deletes the session from the storage' do
+      delete_session
+      expect(redis).to have_received(:del).with(session_store_key)
     end
 
-    subject(:delete_session) { store.delete_session(:env, :sid, :options) }
-
-    before do
-      expect(store).to receive(:cache_key).with(:env, :sid).and_return(:cache_key)
-      expect(cache).to receive(:delete).with(:cache_key)
-    end
-
-    it 'deletes from cache and return the sid' do
-      expect(delete_session).to eq(:sid)
+    it 'returns the sid' do
+      expect(delete_session).to eq :sid
     end
   end
 

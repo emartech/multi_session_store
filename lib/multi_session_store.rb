@@ -7,44 +7,45 @@ require "action_dispatch"
 module ActionDispatch
   module Session
     class MultiSessionStore < AbstractStore
-      def initialize(app, options = {})
-        @cache = options[:cache]
-        options[:expire_after] ||= @cache.options[:expires_in]
-        @param = options[:param]
-        @serializer = options[:serializer]
+      DEFAULT_SESSION_EXPIRATION = 24 * 60 * 60
 
+      def initialize(app, options = {})
+        options[:expire_after] ||= DEFAULT_SESSION_EXPIRATION
+        options[:param_name] ||= 'subsession_id'
+        @redis = options[:redis]
+        @param_name = options[:param_name]
+        @serializer = options[:serializer]
         super
       end
 
       def find_session(env, sid)
-        sid ||= generate_sid
-        session = @serializer.parse(@cache.read(cache_key(env, sid)) || "{}")
-
-        [sid, session]
+        if sid
+          session_data = @serializer.parse @redis.get(session_store_key(env, sid))
+          [sid, session_data]
+        else
+          [generate_sid, {}]
+        end
       end
 
       def write_session(env, sid, session, options)
-        key = cache_key(env, sid)
-
+        key = session_store_key env, sid
         if session
-          @cache.write(key, @serializer.dump(session), expires_in: options[:expire_after])
+          @redis.set key, @serializer.dump(session), ex: options[:expire_after]
         else
-          @cache.delete(key)
+          @redis.del key
         end
-
         sid
       end
 
       def delete_session(env, sid, options)
-        @cache.delete(cache_key(env, sid))
-
+        @redis.del session_store_key(env, sid)
         sid
       end
 
       private
 
-      def cache_key(env, sid)
-        subsession_id = env.params[@param] || "no_subsession"
+      def session_store_key(env, sid)
+        subsession_id = env.params[@param_name] || 'no_subsession'
         "_session_id:#{sid}:#{subsession_id}"
       end
     end
