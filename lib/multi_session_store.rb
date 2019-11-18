@@ -20,7 +20,8 @@ module ActionDispatch
 
       def find_session(env, sid)
         if sid
-          session_data = @serializer.parse @redis.get(session_store_key(env, sid))
+          serialized_session_data = @redis.get session_store_key(env, sid)
+          session_data = serialized_session_data ? @serializer.parse(serialized_session_data) : {}
           [sid, session_data]
         else
           [generate_sid, {}]

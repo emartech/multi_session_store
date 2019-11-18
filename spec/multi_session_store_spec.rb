@@ -69,9 +69,10 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
 
     context 'with an sid' do
       subject(:find_session) { store.find_session env, :sid }
+      let(:serialized_session_data) { :serialized_session_data }
 
       before do
-        allow(redis).to receive(:get).with(session_store_key).and_return(:serialized_session_data)
+        allow(redis).to receive(:get).with(session_store_key).and_return(serialized_session_data)
         allow(serializer).to receive(:parse).with(:serialized_session_data).and_return(:session_data)
       end
 
@@ -90,6 +91,14 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
 
         it 'returns the sid passed in and the corresponding session in an array' do
           expect(find_session).to eq [:sid, :session_data]
+        end
+
+        context 'but there is no session data yet' do
+          let(:serialized_session_data) { nil }
+
+          it 'returns the sid passed in and empty session data' do
+            expect(find_session).to eq [:sid, {}]
+          end
         end
       end
     end
