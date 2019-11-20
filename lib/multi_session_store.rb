@@ -3,6 +3,7 @@ require "multi_session_store/subsession_generator_middleware"
 require "multi_session_store/default_url_options"
 require "multi_session_store/railtie" if defined? Rails
 require "action_dispatch"
+require 'json'
 
 module ActionDispatch
   module Session
@@ -12,6 +13,7 @@ module ActionDispatch
       def initialize(app, options = {})
         options[:expire_after] ||= DEFAULT_SESSION_EXPIRATION
         options[:param_name] ||= 'subsession_id'
+        options[:serializer] ||= JSON
         @redis = options[:redis]
         @param_name = options[:param_name]
         @serializer = options[:serializer]

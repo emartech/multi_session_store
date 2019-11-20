@@ -33,7 +33,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
       end
     end
 
-    context 'with a param_name option' do
+    context 'with a :param_name option' do
       let(:options) { {param_name: 'my_store_param'} }
 
       it 'persists it in default_options' do
@@ -41,17 +41,23 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
       end
     end
 
-    context 'without a param_name option' do
+    context 'without a :param_name option' do
       it 'persists it in default_options' do
         expect(store.default_options[:param_name]).to eq 'subsession_id'
       end
     end
 
-    context 'with a serializer option' do
-      let(:options) { {serializer: 'JSON'} }
+    context 'with a :serializer option' do
+      let(:options) { {serializer: Marshal} }
 
       it 'persists it in default_options' do
-        expect(store.default_options[:serializer]).to eq 'JSON'
+        expect(store.default_options[:serializer]).to eq Marshal
+      end
+    end
+
+    context 'without a :serializer option' do
+      it 'persists it in default_options' do
+        expect(store.default_options[:serializer]).to eq JSON
       end
     end
   end
