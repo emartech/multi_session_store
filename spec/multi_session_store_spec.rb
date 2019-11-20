@@ -1,14 +1,13 @@
 require 'redis/distributed'
 
 RSpec.describe ActionDispatch::Session::MultiSessionStore do
-  subject(:store) { described_class.new(:app, redis: redis, serializer: serializer) }
+  subject(:store) { described_class.new :app, redis: redis }
   let(:redis) { instance_spy Redis::Distributed }
-  let(:serializer) { double 'Serializer' }
   let(:env) { OpenStruct.new params: params }
   let(:params) { {} }
 
   describe '#initialize' do
-    subject(:store) { described_class.new(:app, options) }
+    subject(:store) { described_class.new :app, options }
     let(:options) { {} }
 
     context 'with a :redis option' do
@@ -75,11 +74,11 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
 
     context 'with an sid' do
       subject(:find_session) { store.find_session env, :sid }
-      let(:serialized_session_data) { :serialized_session_data }
+      let(:session_data) { {"key" => "value"} }
+      let(:serialized_session_data) { session_data.to_json }
 
       before do
         allow(redis).to receive(:get).with(session_store_key).and_return(serialized_session_data)
-        allow(serializer).to receive(:parse).with(:serialized_session_data).and_return(:session_data)
       end
 
       context "and we don't have a subsession ID yet" do
@@ -87,7 +86,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
         let(:session_store_key) { '_session_id:sid:no_subsession' }
 
         it 'returns the sid passed in and the corresponding session in an array' do
-          expect(find_session).to eq [:sid, :session_data]
+          expect(find_session).to eq [:sid, session_data]
         end
       end
 
@@ -96,7 +95,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
         let(:session_store_key) { '_session_id:sid:subsid' }
 
         it 'returns the sid passed in and the corresponding session in an array' do
-          expect(find_session).to eq [:sid, :session_data]
+          expect(find_session).to eq [:sid, session_data]
         end
 
         context 'but there is no session data yet' do
@@ -111,21 +110,17 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
   end
 
   describe '#write_session' do
-    subject(:write_session) { store.write_session(env, :sid, session, options) }
+    subject(:write_session) { store.write_session(env, :sid, session_data, options) }
     let(:options) { {expire_after: 123} }
     let(:params) { {'subsession_id' => 'subsid'} }
     let(:session_store_key) { '_session_id:sid:subsid' }
 
     context 'with a session' do
-      let(:session) { :session_data }
-
-      before do
-        allow(serializer).to receive(:dump).with(:session_data).and_return(:serialized_session_data)
-      end
+      let(:session_data) { {"key" => "value"} }
 
       it 'writes the session to the storage' do
         write_session
-        expect(redis).to have_received(:set).with(session_store_key, :serialized_session_data, ex: 123)
+        expect(redis).to have_received(:set).with(session_store_key, session_data.to_json, ex: 123)
       end
 
       it 'returns the sid' do
@@ -134,7 +129,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
     end
 
     context 'without a session' do
-      let(:session) { nil }
+      let(:session_data) { nil }
 
       it 'deletes the session from the storage' do
         write_session
