@@ -157,7 +157,38 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
     end
   end
 
-  it "has a version number" do
+  describe '#validate_sessions' do
+    before do
+      allow(redis).to receive(:keys).with('_session_id:*').and_return(session_keys)
+    end
+
+    let(:session_keys) { sessions.keys }
+    let(:sessions) do
+      {
+        '_session_id:1:1' => {'msid' => 'invalid' },
+        '_session_id:1:2' => {'msid' => 'valid' },
+        '_session_id:2:1' => {'msid' => 'notvalid' }
+      }
+    end
+
+    before do
+      allow(redis).to receive(:get) { |key| sessions[key].to_json }
+    end
+
+    it 'iterates through sessions' do
+      memo = []
+      store.validate_sessions { |session| memo << session }
+      expect(memo).to match_array sessions.values
+    end
+
+    it 'deletes the invalid ones' do
+      store.validate_sessions { |session| session['msid'] == "valid" }
+      expect(redis).to have_received(:del).with('_session_id:1:1')
+      expect(redis).to have_received(:del).with('_session_id:2:1')
+    end
+  end
+
+  it 'has a version number' do
     expect(MultiSessionStore::VERSION).not_to be nil
   end
 end

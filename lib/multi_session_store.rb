@@ -45,11 +45,27 @@ module ActionDispatch
         sid
       end
 
+      def validate_sessions(&block)
+        all_sessions.each do |key, session|
+          @redis.del key unless block.call session
+        end
+      end
+
       private
 
       def session_store_key(env, sid)
         subsession_id = env.params[@param_name] || 'no_subsession'
         "_session_id:#{sid}:#{subsession_id}"
+      end
+
+      def all_sessions
+        session_store_keys.each_with_object({}) do |key, memo|
+          memo[key] = @serializer.parse(@redis.get(key))
+        end
+      end
+
+      def session_store_keys
+        @redis.keys "_session_id:*"
       end
     end
   end
