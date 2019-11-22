@@ -1,7 +1,7 @@
 require 'redis/distributed'
 
 RSpec.describe ActionDispatch::Session::MultiSessionStore do
-  subject(:store) { described_class.new :app, redis: redis }
+  let(:store) { described_class.new :app, redis: redis }
   let(:redis) { instance_spy Redis::Distributed }
   let(:env) { OpenStruct.new params: params }
   let(:params) { {} }
@@ -62,18 +62,22 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
   end
 
   describe '#find_session' do
+    subject(:find_session) { store.find_session env, sid }
+
     before do
       allow(store).to receive(:generate_sid).and_return(:generated_sid)
     end
 
     context 'without an sid' do
+      let(:sid) { nil }
+
       it 'returns a generated sid and an empty session hash in an array' do
-        expect(store.find_session(:env, nil)).to eql([:generated_sid, {}])
+        expect(find_session).to eql([:generated_sid, {}])
       end
     end
 
     context 'with an sid' do
-      subject(:find_session) { store.find_session env, :sid }
+      let(:sid) { :sid }
       let(:session_data) { {"key" => "value"} }
       let(:serialized_session_data) { session_data.to_json }
 
@@ -111,6 +115,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
 
   describe '#write_session' do
     subject(:write_session) { store.write_session(env, :sid, session_data, options) }
+
     let(:options) { {expire_after: 123} }
     let(:params) { {'subsession_id' => 'subsid'} }
     let(:session_store_key) { '_session_id:sid:subsid' }
@@ -144,6 +149,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
 
   describe '#delete_session' do
     subject(:delete_session) { store.delete_session(env, :sid, :options) }
+
     let(:params) { {'subsession_id' => 'subsid'} }
     let(:session_store_key) { '_session_id:sid:subsid' }
 
