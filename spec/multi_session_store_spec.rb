@@ -42,7 +42,7 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
 
     context 'without a :param_name option' do
       it 'persists it in default_options' do
-        expect(store.default_options[:param_name]).to eq 'subsession_id'
+        expect(store.default_options[:param_name]).to eq described_class::DEFAULT_PARAM_NAME
       end
     end
 

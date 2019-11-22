@@ -9,10 +9,11 @@ module ActionDispatch
   module Session
     class MultiSessionStore < AbstractStore
       DEFAULT_SESSION_EXPIRATION = 24 * 60 * 60
+      DEFAULT_PARAM_NAME = 'subsession_id'.freeze
 
       def initialize(app, options = {})
         options[:expire_after] ||= DEFAULT_SESSION_EXPIRATION
-        options[:param_name] ||= 'subsession_id'
+        options[:param_name] ||= DEFAULT_PARAM_NAME
         options[:serializer] ||= JSON
         @redis = options[:redis]
         @param_name = options[:param_name]
