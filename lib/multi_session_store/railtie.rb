@@ -8,8 +8,8 @@ module MultiSessionStore
                                           exclude_paths: app.config.multi_session_store.exclude_paths
     end
 
-    config.after_initialize do
-      ApplicationController.prepend MultiSessionStore::DefaultUrlOptions
+    config.to_prepare do
+      ApplicationController.prepend MultiSessionStore::DefaultUrlOptions unless ApplicationController.ancestors.include? MultiSessionStore::DefaultUrlOptions
     end
   end
 end
