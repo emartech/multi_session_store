@@ -16,7 +16,7 @@ RSpec.describe MultiSessionStore::SubsessionGeneratorMiddleware do
       }
     end
     let(:query_string) { '' }
-    let(:request) { Rack::Request.new env }
+    let(:request) { ActionDispatch::Request.new env }
 
     before do
       allow(app).to receive(:call).with(env).and_return(call_result)

@@ -8,8 +8,8 @@ module MultiSessionStore
     end
 
     def call(env)
-      request = Rack::Request.new(env)
-      request.update_param 'subsession_id', new_subsession_id if subsession_id_is_needed?(request)
+      request = ActionDispatch::Request.new(env)
+      request.params[:subsession_id] = new_subsession_id if subsession_id_is_needed?(request)
       @app.call(env)
     end
 
@@ -20,7 +20,7 @@ module MultiSessionStore
     end
 
     def subsession_id_is_needed?(request)
-      !request.params['subsession_id'] && !path_excluded?(request.path)
+      !request.params[:subsession_id] && !path_excluded?(request.path)
     end
 
     def path_excluded?(current_path)
