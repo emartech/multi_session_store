@@ -16,7 +16,7 @@ RSpec.describe MultiSessionStore::SubsessionGeneratorMiddleware do
       }
     end
     let(:query_string) { '' }
-    let(:request) { ActionDispatch::Request.new env }
+    let(:request) { Rack::Request.new env }
 
     before do
       allow(app).to receive(:call).with(env).and_return(call_result)
@@ -36,6 +36,15 @@ RSpec.describe MultiSessionStore::SubsessionGeneratorMiddleware do
       let(:query_string) { 'subsession_id=subsession_ID_hash' }
 
       it 'does not overwrite the existing ID' do
+        call
+        expect(request.params).to include 'subsession_id' => 'subsession_ID_hash'
+      end
+    end
+
+    context 'when the request has an HTTP_X_SUBSESSIONID header' do
+      before { env['HTTP_X_SUBSESSIONID'] = 'subsession_ID_hash' }
+
+      it 'stores the header value into the request params and does not generate a new ID' do
         call
         expect(request.params).to include 'subsession_id' => 'subsession_ID_hash'
       end
