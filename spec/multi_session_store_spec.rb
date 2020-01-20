@@ -171,9 +171,9 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
     let(:session_keys) { sessions.keys }
     let(:sessions) do
       {
-        '_session_id:1:1' => {'msid' => 'invalid' },
-        '_session_id:1:2' => {'msid' => 'valid' },
-        '_session_id:2:1' => {'msid' => 'notvalid' }
+        '_session_id:1:1' => {'msid' => 'invalid'},
+        '_session_id:1:2' => {'msid' => 'valid'},
+        '_session_id:2:1' => {'msid' => 'notvalid'}
       }
     end
 
@@ -191,6 +191,19 @@ RSpec.describe ActionDispatch::Session::MultiSessionStore do
       store.validate_sessions { |session| session['msid'] == "valid" }
       expect(redis).to have_received(:del).with('_session_id:1:1')
       expect(redis).to have_received(:del).with('_session_id:2:1')
+    end
+
+    context 'when a key is missing during enumeration (e.g. its TTL just expired)' do
+      before { allow(redis).to receive(:get).with(session_keys.last).and_return(nil) }
+
+      it 'does not raise error' do
+        expect { store.validate_sessions {} }.not_to raise_error
+      end
+
+      it 'still deletes the keys found' do
+        store.validate_sessions { |session| session['msid'] == "valid" }
+        expect(redis).to have_received(:del).with('_session_id:1:1')
+      end
     end
   end
 

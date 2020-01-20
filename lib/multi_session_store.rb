@@ -61,7 +61,9 @@ module ActionDispatch
 
       def all_sessions
         session_store_keys.each_with_object({}) do |key, memo|
-          memo[key] = @serializer.parse(@redis.get(key))
+          serialized_value = @redis.get key
+          next if serialized_value.nil?
+          memo[key] = @serializer.parse serialized_value
         end
       end
 
